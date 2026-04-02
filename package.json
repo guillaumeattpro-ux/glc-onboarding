@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:public": "vite preview --host --port 4173",
+    "tunnel": "npx localtunnel --port 4173"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.2.1",

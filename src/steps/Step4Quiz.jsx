@@ -1,47 +1,84 @@
 import { useState } from 'react'
 import config from '../config'
 
-export default function Step4Quiz({ onNext, updateData }) {
+const initAnswer = { text: '' }
+
+export default function Step4Quiz({ onNext, updateData, clientData }) {
   const [current, setCurrent] = useState(0)
-  const [answers, setAnswers] = useState({})
-  const [slider, setSlider] = useState(5)
-  const [text, setText] = useState('')
+  const [answers, setAnswers] = useState(() => clientData?.questionnaire || {})
+  const [text, setText] = useState(() => clientData?.questionnaire?.[0]?.text ?? '')
 
   const q = config.questionnaire[current]
   const total = config.questionnaire.length
-  const progress = ((current) / total) * 100
+  const progress = ((current + 1) / total) * 100
+
+  const getAnswerAt = (idx) => answers[idx] || initAnswer
+
+  const persistAnswer = (index, value) => {
+    const nextAnswers = {
+      ...answers,
+      [index]: {
+        question: config.questionnaire[index].question,
+        bloc: config.questionnaire[index].bloc,
+        text: value.text,
+      },
+    }
+    setAnswers(nextAnswers)
+    updateData({ questionnaire: nextAnswers })
+    return nextAnswers
+  }
 
   const handleNext = () => {
-    const newAnswers = {
-      ...answers,
-      [current]: { question: q.question, bloc: q.bloc, slider, text }
-    }
-    setAnswers(newAnswers)
+    persistAnswer(current, { text })
 
     if (current + 1 >= total) {
-      updateData({ questionnaire: newAnswers })
       onNext()
     } else {
-      setCurrent(current + 1)
-      setSlider(5)
-      setText('')
+      const nextIndex = current + 1
+      const nextAnswer = getAnswerAt(nextIndex)
+      setCurrent(nextIndex)
+      setText(nextAnswer.text ?? '')
     }
+  }
+
+  const handleBack = () => {
+    persistAnswer(current, { text })
+    const prevIndex = Math.max(0, current - 1)
+    const prevAnswer = getAnswerAt(prevIndex)
+    setCurrent(prevIndex)
+    setText(prevAnswer.text ?? '')
+  }
+
+  const handleSkip = () => {
+    persistAnswer(current, { text: '' })
+    if (current + 1 >= total) {
+      onNext()
+      return
+    }
+    const nextIndex = current + 1
+    const nextAnswer = getAnswerAt(nextIndex)
+    setCurrent(nextIndex)
+    setText(nextAnswer.text ?? '')
   }
 
   const canContinue = text.trim().length > 10
 
   return (
     <div style={{
-      minHeight: '100vh', padding: '100px 40px 60px',
-      display: 'flex', flexDirection: 'column', alignItems: 'center'
+      minHeight: '100vh',
+      padding: '100px 16px 60px',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      overflowX: 'hidden',
     }}>
-      <div style={{ maxWidth: '640px', width: '100%' }}>
+      <div style={{ maxWidth: '640px', width: '100%', overflowX: 'hidden' }}>
 
         {/* HEADER */}
         <div style={{ marginBottom: '40px' }}>
           <div style={{
             display: 'flex', justifyContent: 'space-between',
-            alignItems: 'center', marginBottom: '12px'
+            alignItems: 'center', marginBottom: '12px', gap: '8px'
           }}>
             <div style={{
               fontFamily: "'Bebas Neue', sans-serif",
@@ -51,7 +88,7 @@ export default function Step4Quiz({ onNext, updateData }) {
             </div>
             <div style={{
               fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: '11px', letterSpacing: '2px', color: '#444'
+              fontSize: '10px', letterSpacing: '1px', color: '#444'
             }}>
               {current + 1} / {total}
             </div>
@@ -71,42 +108,15 @@ export default function Step4Quiz({ onNext, updateData }) {
         {/* QUESTION */}
         <div style={{
           background: '#111', border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: '16px', padding: '40px', marginBottom: '24px'
+          borderRadius: '16px', padding: '24px', marginBottom: '24px'
         }}>
           <h3 style={{
             fontFamily: "'Bebas Neue', sans-serif",
-            fontSize: '22px', letterSpacing: '2px',
-            color: '#F0EDE8', lineHeight: 1.4, marginBottom: '32px'
+            fontSize: 'clamp(18px, 5vw, 22px)', letterSpacing: '1.5px',
+            color: '#F0EDE8', lineHeight: 1.4, marginBottom: '24px'
           }}>
             {q.question}
           </h3>
-
-          {/* SLIDER */}
-          <div style={{ marginBottom: '28px' }}>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between',
-              marginBottom: '10px'
-            }}>
-              <span style={{
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: '9px', letterSpacing: '2px', color: '#444'
-              }}>Pas du tout</span>
-              <span style={{
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: '14px', letterSpacing: '2px', color: '#C9A44A'
-              }}>{slider} / 10</span>
-              <span style={{
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: '9px', letterSpacing: '2px', color: '#444'
-              }}>Totalement</span>
-            </div>
-            <input
-              type="range" min="0" max="10" step="1"
-              value={slider}
-              onChange={e => setSlider(Number(e.target.value))}
-              style={{ width: '100%', accentColor: '#C9A44A', cursor: 'pointer' }}
-            />
-          </div>
 
           {/* TEXTE LIBRE */}
           <div>
@@ -122,7 +132,7 @@ export default function Step4Quiz({ onNext, updateData }) {
               onChange={e => setText(e.target.value)}
               placeholder="Prends le temps d'être honnête avec toi-même..."
               style={{
-                width: '100%', minHeight: '140px',
+                width: '100%', minHeight: '140px', maxWidth: '100%',
                 background: 'rgba(255,255,255,0.03)',
                 border: '1px solid rgba(255,255,255,0.08)',
                 borderRadius: '8px', color: '#F0EDE8',
@@ -145,30 +155,48 @@ export default function Step4Quiz({ onNext, updateData }) {
         </div>
 
         {/* BOUTON */}
-        <button
-          onClick={handleNext}
-          disabled={!canContinue}
-          style={{
-            width: '100%', padding: '18px',
-            fontFamily: "'Bebas Neue', sans-serif",
-            fontSize: '14px', letterSpacing: '3px',
-            background: canContinue ? '#C9A44A' : 'rgba(255,255,255,0.04)',
-            border: `1px solid ${canContinue ? '#C9A44A' : 'rgba(255,255,255,0.08)'}`,
-            color: canContinue ? '#0D0D0D' : '#444',
-            cursor: canContinue ? 'pointer' : 'not-allowed',
-            borderRadius: '10px', transition: 'all .3s'
-          }}
-        >
-          {current + 1 >= total
-            ? 'Terminer le questionnaire →'
-            : `Question suivante → (${current + 2}/${total})`
-          }
-        </button>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          <button
+            onClick={handleBack}
+            disabled={current === 0}
+            style={{
+              width: '100%', padding: '16px',
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: '13px', letterSpacing: '2px',
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: current === 0 ? '#333' : '#F0EDE8',
+              cursor: current === 0 ? 'not-allowed' : 'pointer',
+              borderRadius: '10px', transition: 'all .3s'
+            }}
+          >
+            ← Retour
+          </button>
+          <button
+            onClick={handleNext}
+            disabled={!canContinue}
+            style={{
+              width: '100%', padding: '16px',
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: '13px', letterSpacing: '2px',
+              background: canContinue ? '#C9A44A' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${canContinue ? '#C9A44A' : 'rgba(255,255,255,0.08)'}`,
+              color: canContinue ? '#0D0D0D' : '#444',
+              cursor: canContinue ? 'pointer' : 'not-allowed',
+              borderRadius: '10px', transition: 'all .3s'
+            }}
+          >
+            {current + 1 >= total
+              ? 'Terminer →'
+              : `Suivant (${current + 2}/${total}) →`
+            }
+          </button>
+        </div>
 
         {/* SKIP */}
         {canContinue && (
           <button
-            onClick={() => { setText(''); handleNext() }}
+            onClick={handleSkip}
             style={{
               width: '100%', padding: '12px', marginTop: '8px',
               fontFamily: "'Bebas Neue', sans-serif",

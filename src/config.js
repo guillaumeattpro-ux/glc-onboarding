@@ -5,6 +5,12 @@ const config = {
     tagline: "Le mois le moins confortable de ta vie · Be The Guy",
     citation: "Le confort est l'ennemi du progrès",
     citation_auteur: "Gentleman Létal, Mars 2026",
+
+    // VIDEO D'ACCUEIL (Step 1) — URL absolue pour chargement partout (local + prod)
+    welcome_video: {
+      src: "https://glc-onboarding.vercel.app/videos/welcome.mp4",
+      poster: "",
+    },
   
     // PROCHAIN CALL
     prochain_call: {

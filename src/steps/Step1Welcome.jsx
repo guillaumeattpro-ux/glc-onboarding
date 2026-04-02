@@ -1,11 +1,52 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
 import config from '../config'
 
+/** Même fichier que sur Vercel — fallback si config absente (évite écran vide après merge) */
+const DEFAULT_WELCOME_MP4 = 'https://glc-onboarding.vercel.app/videos/welcome.mp4'
+
+/** Largeur utile sous la carte (carte élargie − padding latéral) */
+const CARD_INNER_MAX_W = 940
+
+/** Cadre aux mêmes proportions que la vidéo, le plus grand possible dans maxW × maxH → contain remplit tout le noir */
+function fitBoxToVideo(video) {
+  const vw = video.videoWidth
+  const vh = video.videoHeight
+  if (!vw || !vh) return null
+  const maxW = Math.min(CARD_INNER_MAX_W, window.innerWidth - 40)
+  const maxH = Math.min(window.innerHeight * 0.68, 640)
+  let w = maxW
+  let h = (w * vh) / vw
+  if (h > maxH) {
+    h = maxH
+    w = (h * vw) / vh
+  }
+  return { width: Math.round(w), height: Math.round(h) }
+}
+
 export default function Step1Welcome({ onNext }) {
+  const videoSrc = config.welcome_video?.src?.trim() || DEFAULT_WELCOME_MP4
+  const videoRef = useRef(null)
+  const [box, setBox] = useState(null)
+
+  const fitVideoBox = useCallback((video) => {
+    const next = fitBoxToVideo(video)
+    if (next) setBox(next)
+  }, [])
+
+  useEffect(() => {
+    const onResize = () => {
+      const v = videoRef.current
+      if (v?.videoWidth) fitVideoBox(v)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [fitVideoBox])
+
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      padding: '40px', textAlign: 'center', paddingTop: '80px'
+      padding: '40px clamp(16px, 4vw, 48px)', textAlign: 'center', paddingTop: '80px'
     }}>
       <div style={{
         fontFamily: "'Bebas Neue', sans-serif",
@@ -28,7 +69,7 @@ export default function Step1Welcome({ onNext }) {
       <p style={{
         fontFamily: "'Bebas Neue', sans-serif",
         fontSize: '13px', letterSpacing: '4px',
-        color: '#555', marginBottom: '60px',
+        color: '#555', marginBottom: '28px',
         maxWidth: '500px'
       }}>
         {config.tagline}
@@ -36,29 +77,57 @@ export default function Step1Welcome({ onNext }) {
 
       <div style={{
         background: '#111', border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: '16px', padding: '48px', maxWidth: '600px',
-        width: '100%', marginBottom: '48px'
+        borderRadius: '16px', padding: 'clamp(16px, 2.5vw, 28px)',
+        maxWidth: 'min(1000px, 100%)',
+        width: '100%', marginBottom: '32px'
       }}>
         <div style={{
           fontFamily: "'Bebas Neue', sans-serif",
           fontSize: '10px', letterSpacing: '4px', color: '#C9A44A',
-          marginBottom: '24px'
+          marginBottom: '16px'
         }}>Message du mentor</div>
 
-        <p style={{
-          fontSize: '16px', fontWeight: 300, color: '#F0EDE8',
-          lineHeight: '1.9', marginBottom: '32px'
-        }}>
-          Tu viens de faire quelque chose que la plupart des gens ne feront jamais — tu as choisi l'inconfort.
-          <br /><br />
-          Ce programme va te pousser hors de ta zone de confort. C'est exactement pour ça que tu es là.
-          <br /><br />
-          Avant de commencer, prends 5 minutes pour compléter cet onboarding. Il me permettra de t'accompagner de la meilleure façon possible.
-        </p>
+        <div style={{ marginBottom: '8px' }}>
+          <div style={{
+            position: 'relative',
+            width: box ? `${box.width}px` : '100%',
+            height: box ? `${box.height}px` : 'min(42vh, 400px)',
+            maxWidth: '100%',
+            margin: '0 auto',
+            borderRadius: '6px',
+            overflow: 'hidden',
+            border: '1px solid rgba(255,255,255,0.1)',
+            background: '#000',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)',
+          }}>
+            <video
+              ref={videoRef}
+              poster={config.welcome_video?.poster || undefined}
+              controls
+              playsInline
+              muted
+              autoPlay
+              loop
+              preload="metadata"
+              onLoadedMetadata={(e) => fitVideoBox(e.target)}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                objectPosition: 'center center',
+              }}
+            >
+              <source src={videoSrc} type="video/mp4" />
+              <source src="/videos/welcome.mp4" type="video/mp4" />
+            </video>
+          </div>
+        </div>
 
         <div style={{
           borderTop: '1px solid rgba(201,164,74,0.15)',
-          paddingTop: '24px',
+          paddingTop: '18px',
           fontFamily: "'Bebas Neue', sans-serif",
           fontSize: '13px', letterSpacing: '3px', color: '#C9A44A'
         }}>

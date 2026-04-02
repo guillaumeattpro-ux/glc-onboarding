@@ -1,21 +1,54 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import config from '../config'
 
-export default function Step2Contract({ onNext, updateData }) {
+export default function Step2Contract({ onNext, updateData, clientData }) {
   const canvasRef = useRef(null)
+  const rafRef = useRef(null)
+  const lastPointRef = useRef(null)
   const [drawing, setDrawing] = useState(false)
   const [signed, setSigned] = useState(false)
   const [agreed, setAgreed] = useState(false)
+  const [signatureDate, setSignatureDate] = useState('')
+
+  useEffect(() => {
+    if (clientData?.signatureDateIso) {
+      setSignatureDate(clientData.signatureDateIso)
+    } else {
+      setSignatureDate(new Date().toISOString().slice(0, 10))
+    }
+    if (clientData?.contratSigne) {
+      setSigned(true)
+      setAgreed(true)
+    }
+  }, [clientData])
+
+  useEffect(() => {
+    if (!signatureDate) return
+    const parsedDate = new Date(signatureDate)
+    updateData({
+      signatureDateIso: signatureDate,
+      signatureDate: parsedDate.toLocaleDateString('fr-FR'),
+    })
+  }, [signatureDate, updateData])
+
+  const getPoint = (e) => {
+    const canvas = canvasRef.current
+    const rect = canvas.getBoundingClientRect()
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    }
+  }
 
   const startDraw = (e) => {
     setDrawing(true)
+    canvasRef.current?.setPointerCapture?.(e.pointerId)
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
-    const rect = canvas.getBoundingClientRect()
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left
-    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top
+    const { x, y } = getPoint(e)
     ctx.beginPath()
     ctx.moveTo(x, y)
+    lastPointRef.current = { x, y }
   }
 
   const doDraw = (e) => {
@@ -23,18 +56,30 @@ export default function Step2Contract({ onNext, updateData }) {
     e.preventDefault()
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
-    const rect = canvas.getBoundingClientRect()
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left
-    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top
-    ctx.lineTo(x, y)
-    ctx.strokeStyle = '#C9A44A'
-    ctx.lineWidth = 2
-    ctx.lineCap = 'round'
-    ctx.stroke()
+    const point = getPoint(e)
+
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current)
+    }
+    rafRef.current = requestAnimationFrame(() => {
+      const from = lastPointRef.current || point
+      const midX = (from.x + point.x) / 2
+      const midY = (from.y + point.y) / 2
+      ctx.strokeStyle = '#C9A44A'
+      ctx.lineWidth = 2.4
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.quadraticCurveTo(from.x, from.y, midX, midY)
+      ctx.stroke()
+      lastPointRef.current = point
+    })
     setSigned(true)
   }
 
-  const stopDraw = () => setDrawing(false)
+  const stopDraw = () => {
+    setDrawing(false)
+    lastPointRef.current = null
+  }
 
   const clearCanvas = () => {
     const canvas = canvasRef.current
@@ -45,14 +90,20 @@ export default function Step2Contract({ onNext, updateData }) {
 
   const handleSign = () => {
     const signatureData = canvasRef.current.toDataURL()
-    const date = new Date().toLocaleDateString('fr-FR')
-    updateData({ signature: signatureData, signatureDate: date, contratSigne: true })
+    const parsedDate = signatureDate ? new Date(signatureDate) : new Date()
+    const date = parsedDate.toLocaleDateString('fr-FR')
+    updateData({
+      signature: signatureData,
+      signatureDate: date,
+      signatureDateIso: signatureDate,
+      contratSigne: true,
+    })
     onNext()
   }
 
   return (
     <div style={{
-      minHeight: '100vh', padding: '100px 40px 60px',
+      minHeight: '100vh', padding: '100px 16px 60px',
       display: 'flex', flexDirection: 'column', alignItems: 'center'
     }}>
       <div style={{ maxWidth: '680px', width: '100%' }}>
@@ -67,7 +118,7 @@ export default function Step2Contract({ onNext, updateData }) {
 
         <h2 style={{
           fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: '42px', letterSpacing: '3px',
+          fontSize: 'clamp(28px, 8vw, 42px)', letterSpacing: '3px',
           color: '#F0EDE8', marginBottom: '40px'
         }}>
           Ton engagement
@@ -76,7 +127,7 @@ export default function Step2Contract({ onNext, updateData }) {
         {/* CONTRAT */}
         <div style={{
           background: '#111', border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: '14px', padding: '36px', marginBottom: '32px'
+          borderRadius: '14px', padding: '22px', marginBottom: '24px'
         }}>
           <pre style={{
             fontFamily: "'Inter', sans-serif",
@@ -110,10 +161,40 @@ export default function Step2Contract({ onNext, updateData }) {
           </span>
         </div>
 
+        <div style={{ marginBottom: '16px' }}>
+          <label
+            htmlFor="signature-date"
+            style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: '10px',
+              letterSpacing: '3px',
+              color: '#C9A44A',
+              display: 'block',
+              marginBottom: '8px',
+            }}
+          >
+            Date de signature
+          </label>
+          <input
+            id="signature-date"
+            type="date"
+            value={signatureDate}
+            onChange={(e) => setSignatureDate(e.target.value)}
+            style={{
+              width: '100%',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '8px',
+              padding: '12px',
+              color: '#F0EDE8',
+            }}
+          />
+        </div>
+
         {/* SIGNATURE */}
         <div style={{
           background: '#111', border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: '14px', padding: '28px', marginBottom: '32px'
+          borderRadius: '14px', padding: '18px', marginBottom: '24px'
         }}>
           <div style={{
             fontFamily: "'Bebas Neue', sans-serif",
@@ -125,14 +206,16 @@ export default function Step2Contract({ onNext, updateData }) {
           <canvas
             ref={canvasRef}
             width={580} height={150}
-            onMouseDown={startDraw} onMouseMove={doDraw}
-            onMouseUp={stopDraw} onMouseLeave={stopDraw}
-            onTouchStart={startDraw} onTouchMove={doDraw} onTouchEnd={stopDraw}
+            onPointerDown={startDraw}
+            onPointerMove={doDraw}
+            onPointerUp={stopDraw}
+            onPointerLeave={stopDraw}
             style={{
               width: '100%', height: '150px',
               background: 'rgba(255,255,255,0.02)',
               border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '8px', cursor: 'crosshair', display: 'block'
+              borderRadius: '8px', cursor: 'crosshair', display: 'block',
+              touchAction: 'none',
             }}
           />
           <div style={{
@@ -161,19 +244,19 @@ export default function Step2Contract({ onNext, updateData }) {
 
         <button
           onClick={handleSign}
-          disabled={!signed || !agreed}
+          disabled={!signed || !agreed || !signatureDate}
           style={{
             width: '100%', padding: '18px',
             fontFamily: "'Bebas Neue', sans-serif",
             fontSize: '14px', letterSpacing: '3px',
-            background: signed && agreed ? '#C9A44A' : 'rgba(255,255,255,0.04)',
-            border: `1px solid ${signed && agreed ? '#C9A44A' : 'rgba(255,255,255,0.08)'}`,
-            color: signed && agreed ? '#0D0D0D' : '#444',
-            cursor: signed && agreed ? 'pointer' : 'not-allowed',
+            background: signed && agreed && signatureDate ? '#C9A44A' : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${signed && agreed && signatureDate ? '#C9A44A' : 'rgba(255,255,255,0.08)'}`,
+            color: signed && agreed && signatureDate ? '#0D0D0D' : '#444',
+            cursor: signed && agreed && signatureDate ? 'pointer' : 'not-allowed',
             borderRadius: '10px', transition: 'all .3s'
           }}
         >
-          {signed && agreed ? 'Signer et continuer →' : 'Signe le contrat pour continuer'}
+          {signed && agreed && signatureDate ? 'Signer et continuer →' : 'Signe le contrat pour continuer'}
         </button>
 
       </div>

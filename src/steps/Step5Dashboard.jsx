@@ -1,45 +1,93 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import config from '../config'
+import UiModal from '../components/UiModal'
+
+const STORAGE_KEY = 'glc_dashboard_state_v1'
+const NOTES_KEY = 'glc_dashboard_notes_history_v1'
+const defaultRoutines = {
+  matin: [
+    { n: 'Reveil 6h00', streak: '5j', done: true },
+    { n: 'Douche froide', streak: '3j', done: false },
+    { n: 'Lecture 20 min', streak: '7j', done: true },
+    { n: 'Pompes 50', streak: '2j', done: false },
+  ],
+  soir: [
+    { n: 'Revue du jour', streak: '4j', done: false },
+    { n: 'Gratitude', streak: '6j', done: true },
+    { n: "Pas d'ecran 22h", streak: '2j', done: false },
+    { n: 'Lecture 20 min', streak: '5j', done: true },
+  ],
+}
 
 export default function Step5Dashboard({ clientData }) {
   const prenom = clientData?.infos?.prenom || 'Membre'
   const now = new Date()
-  const mois = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
-  const [countdown, setCountdown] = useState({d:'--',h:'--',m:'--',s:'--'})
+  const mois = ['Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre']
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 900)
+  const [countdown, setCountdown] = useState({ d: '00', h: '00', m: '00', s: '00' })
   const [calYear, setCalYear] = useState(now.getFullYear())
   const [calMonth, setCalMonth] = useState(now.getMonth())
-  const [doneDays, setDoneDays] = useState(new Set())
   const [todoTab, setTodoTab] = useState('semaine')
+  const [newTodo, setNewTodo] = useState('')
+  const [todoDraftTitle, setTodoDraftTitle] = useState('')
+  const [noteDraft, setNoteDraft] = useState('')
+  const [notesHistory, setNotesHistory] = useState(() => {
+    try {
+      const raw = localStorage.getItem(NOTES_KEY)
+      return raw ? JSON.parse(raw) : []
+    } catch {
+      return []
+    }
+  })
   const [todos, setTodos] = useState({
-    mois: [{t:'Définir mon offre principale',done:false},{t:'Créer ma page de vente',done:false}],
-    semaine: [{t:'Session deep work 9h-11h',done:true},{t:'Relire les notes du call',done:false},{t:'30 min de prospection',done:false}],
-    daily: [{t:'Méditation 10 min',done:false},{t:'Lecture 20 min',done:true}]
+    mois: [{ t: 'Definir mon offre principale', done: false }, { t: 'Creer ma page de vente', done: false }],
+    semaine: [{ t: 'Session deep work 9h-11h', done: true }, { t: 'Relire les notes du call', done: false }, { t: '30 min de prospection', done: false }],
+    daily: [{ t: 'Meditation 10 min', done: false }, { t: 'Lecture 20 min', done: true }],
   })
-  const [routines, setRoutines] = useState({
-    matin: [{n:'Réveil 6h00',streak:'5j',done:true},{n:'Douche froide',streak:'3j',done:false},{n:'Lecture 20 min',streak:'7j',done:true},{n:'Pompes 50',streak:'2j',done:false}],
-    soir: [{n:'Revue du jour',streak:'4j',done:false},{n:'Gratitude',streak:'6j',done:true},{n:'Pas d\'écran 22h',streak:'2j',done:false},{n:'Lecture 20 min',streak:'5j',done:true}]
+  const [routines, setRoutines] = useState(defaultRoutines)
+  const [eventsMap, setEventsMap] = useState({})
+  const [validatedDays, setValidatedDays] = useState(() => new Set())
+  const [objectifs, setObjectifs] = useState(() => ({
+    Physique: clientData?.questionnaire?.[0]?.text || 'Definis ton objectif physique principal.',
+    Business: clientData?.questionnaire?.[4]?.text || 'Definis ton objectif business du mois.',
+    Personnel: clientData?.questionnaire?.[9]?.text || 'Definis ton objectif personnel.',
+    Blocages: clientData?.questionnaire?.[6]?.text || 'Liste tes blocages actuels.',
+  }))
+  const [modal, setModal] = useState({ type: null })
+  const closeModal = () => setModal({ type: null })
+  const openModal = (type, data = {}) => setModal({ type, ...data })
+
+  const [eventDraft, setEventDraft] = useState({ date: '', title: '' })
+  const [objectifsDraft, setObjectifsDraft] = useState(objectifs)
+  const [habitDraft, setHabitDraft] = useState({
+    mode: 'edit',
+    period: 'matin',
+    index: 0,
+    name: '',
+    streak: '',
+    done: false,
   })
-  const [notes, setNotes] = useState('')
-  const [pomoSec, setPomoSec] = useState(25*60)
-  const [pomoTotal] = useState(25*60)
+  const [contractDraft, setContractDraft] = useState({})
+  const [pomoSec, setPomoSec] = useState(25 * 60)
   const [pomoRunning, setPomoRunning] = useState(false)
   const [pomoPhase, setPomoPhase] = useState('focus')
+  const [pomoVals, setPomoVals] = useState({ f: 25, s: 5, l: 15 })
   const [pomoSess, setPomoSess] = useState(1)
-  const [pomoVals, setPomoVals] = useState({f:25,s:5,l:15})
   const pomoRef = useRef(null)
-  const [newTodo, setNewTodo] = useState('')
 
-  // COUNTDOWN
   useEffect(() => {
     const tick = () => {
       const target = new Date(config.prochain_call.date)
       const diff = target - new Date()
-      if (diff < 0) return
+      if (diff <= 0) {
+        setCountdown({ d: '00', h: '00', m: '00', s: '00' })
+        return
+      }
       setCountdown({
-        d: String(Math.floor(diff/86400000)).padStart(2,'0'),
-        h: String(Math.floor(diff%86400000/3600000)).padStart(2,'0'),
-        m: String(Math.floor(diff%3600000/60000)).padStart(2,'0'),
-        s: String(Math.floor(diff%60000/1000)).padStart(2,'0')
+        d: String(Math.floor(diff / 86400000)).padStart(2, '0'),
+        h: String(Math.floor((diff % 86400000) / 3600000)).padStart(2, '0'),
+        m: String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0'),
+        s: String(Math.floor((diff % 60000) / 1000)).padStart(2, '0'),
       })
     }
     tick()
@@ -47,7 +95,44 @@ export default function Step5Dashboard({ clientData }) {
     return () => clearInterval(id)
   }, [])
 
-  // POMODORO
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 900)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (parsed.todos) setTodos(parsed.todos)
+      if (parsed.routines) setRoutines(parsed.routines)
+      if (parsed.eventsMap) setEventsMap(parsed.eventsMap)
+      if (parsed.validatedDays) setValidatedDays(new Set(parsed.validatedDays))
+      if (parsed.objectifs) setObjectifs(parsed.objectifs)
+    } catch {
+      // ignore corrupted storage
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        todos,
+        routines,
+        eventsMap,
+        validatedDays: Array.from(validatedDays),
+        objectifs,
+      })
+    )
+  }, [todos, routines, eventsMap, validatedDays, objectifs])
+
+  useEffect(() => {
+    localStorage.setItem(NOTES_KEY, JSON.stringify(notesHistory))
+  }, [notesHistory])
+
   useEffect(() => {
     if (pomoRunning) {
       pomoRef.current = setInterval(() => {
@@ -66,33 +151,157 @@ export default function Step5Dashboard({ clientData }) {
     return () => clearInterval(pomoRef.current)
   }, [pomoRunning])
 
-  const pomoTime = `${String(Math.floor(pomoSec/60)).padStart(2,'0')}:${String(pomoSec%60).padStart(2,'0')}`
+  const pomoTime = `${String(Math.floor(pomoSec / 60)).padStart(2, '0')}:${String(pomoSec % 60).padStart(2, '0')}`
   const pomoProg = 465 * (1 - pomoSec / (pomoVals[pomoPhase === 'focus' ? 'f' : pomoPhase === 'short' ? 's' : 'l'] * 60))
 
-  const DN = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim']
+  const DN = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
   const firstDay = new Date(calYear, calMonth, 1).getDay()
   const offset = firstDay === 0 ? 6 : firstDay - 1
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate()
   const isCurMonth = calMonth === now.getMonth() && calYear === now.getFullYear()
 
+  const getDateKey = (day) => `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  const toggleValidatedDay = (day) => {
+    const key = getDateKey(day)
+    setValidatedDays((prev) => {
+      const n = new Set(prev)
+      if (n.has(key)) n.delete(key)
+      else n.add(key)
+      return n
+    })
+  }
+  const getEventsForDay = (day) => {
+    const date = new Date(calYear, calMonth, day)
+    const key = getDateKey(day)
+    const custom = eventsMap[key] || []
+    const monthly = config.evenements[day] ? [config.evenements[day]] : []
+    const isSunday = date.getDay() === 0
+    const live = isSunday ? ['Live'] : []
+    return [...live, ...monthly, ...custom]
+  }
+
+  const openAddEventModal = () => {
+    const defaultDay = isCurMonth ? now.getDate() : 1
+    setEventDraft({ date: getDateKey(defaultDay), title: '' })
+    openModal('event_add')
+  }
+
+  const saveEventFromModal = () => {
+    const dateKey = eventDraft.date
+    const title = eventDraft.title.trim()
+    if (!dateKey || !title) return
+    setEventsMap((prev) => ({
+      ...prev,
+      [dateKey]: [...(prev[dateKey] || []), title],
+    }))
+    closeModal()
+  }
+
+  const saveObjectifsFromModal = () => {
+    const next = {
+      Physique: (objectifsDraft.Physique || '').trim(),
+      Business: (objectifsDraft.Business || '').trim(),
+      Personnel: (objectifsDraft.Personnel || '').trim(),
+      Blocages: (objectifsDraft.Blocages || '').trim(),
+    }
+    setObjectifs(next)
+    closeModal()
+  }
+
+  const saveHabitFromModal = () => {
+    const period = habitDraft.period
+    if (!period || !routines[period]) return
+
+    const name = habitDraft.name.trim()
+    if (!name) return
+
+    const streak = String(habitDraft.streak ?? '').trim() || '0'
+    if (habitDraft.mode === 'add') {
+      setRoutines((prev) => ({
+        ...prev,
+        [period]: [...prev[period], { n: name, streak, done: false }],
+      }))
+      closeModal()
+      return
+    }
+
+    const index = Number(habitDraft.index)
+    if (Number.isNaN(index)) return
+    setRoutines((prev) => ({
+      ...prev,
+      [period]: prev[period].map((item, j) => (j === index ? { ...item, n: name, streak, done: !!habitDraft.done } : item)),
+    }))
+    closeModal()
+  }
+
+  const saveTodoFromModal = () => {
+    const tab = modal?.tab
+    if (!tab || !todos[tab]) return
+
+    const title = todoDraftTitle.trim()
+    if (!title) return
+
+    setTodos((prev) => ({
+      ...prev,
+      [tab]: [...prev[tab], { t: title, done: false }],
+    }))
+
+    setTodoDraftTitle('')
+    closeModal()
+  }
+
+  const openContractModal = () => openModal('contract_view')
+
+  const downloadContract = () => {
+    const blob = new Blob([config.contrat], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'GLC_contrat.txt'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const saveNote = () => {
+    if (!noteDraft.trim()) return
+    const entry = {
+      id: crypto.randomUUID(),
+      text: noteDraft.trim(),
+      createdAt: new Date().toISOString(),
+    }
+    setNotesHistory((prev) => [entry, ...prev])
+    setNoteDraft('')
+  }
+
+  const doneRoutinesCount = Object.values(routines)
+    .flat()
+    .filter((item) => item.done).length
+
+  const validatedDaysCount = validatedDays.size
+  const heroTitleSize = isMobile ? 'clamp(36px, 12vw, 52px)' : 'clamp(52px,7vw,80px)'
+  const countNumberSize = isMobile ? '36px' : '52px'
+  const sectionGap = isMobile ? '24px' : '28px'
+
   const s = {
-    card: { background:'#111', border:'1px solid rgba(255,255,255,0.06)', borderRadius:'14px', overflow:'hidden' },
-    sHead: { display:'flex', alignItems:'center', gap:'16px', marginBottom:'20px' },
-    sTitle: { fontFamily:"'Bebas Neue', sans-serif", fontSize:'18px', letterSpacing:'4px', color:'#F0EDE8' },
-    sLine: { flex:1, height:'1px', background:'linear-gradient(to right,rgba(201,164,74,0.25),transparent)' },
-    sBtn: { fontFamily:"'Bebas Neue', sans-serif", fontSize:'9px', letterSpacing:'2px', color:'#555', background:'transparent', border:'1px solid rgba(255,255,255,0.08)', padding:'7px 14px', cursor:'pointer', borderRadius:'6px' },
-    sBtnG: { fontFamily:"'Bebas Neue', sans-serif", fontSize:'9px', letterSpacing:'2px', color:'#C9A44A', background:'transparent', border:'1px solid rgba(201,164,74,0.35)', padding:'7px 14px', cursor:'pointer', borderRadius:'6px' },
-    label: { fontFamily:"'Bebas Neue', sans-serif", fontSize:'9px', letterSpacing:'4px', color:'#C9A44A', marginBottom:'12px', display:'flex', alignItems:'center', gap:'10px' },
+    card: { background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px', overflow: 'hidden' },
+    sHead: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' },
+    sTitle: { fontFamily: "'Bebas Neue', sans-serif", fontSize: '18px', letterSpacing: '4px', color: '#F0EDE8' },
+    sLine: { flex: 1, minWidth: '40px', height: '1px', background: 'linear-gradient(to right,rgba(201,164,74,0.25),transparent)' },
+    sBtn: { fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '2px', color: '#555', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', padding: '8px 14px', cursor: 'pointer', borderRadius: '6px' },
+    sBtnG: { fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '2px', color: '#C9A44A', background: 'transparent', border: '1px solid rgba(201,164,74,0.35)', padding: '8px 14px', cursor: 'pointer', borderRadius: '6px' },
+    label: { fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '3px', color: '#C9A44A', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' },
   }
 
   return (
-    <div style={{ minHeight:'100vh', padding:'100px 40px 80px', maxWidth:'1080px', margin:'0 auto' }}>
+    <div style={{ minHeight: '100vh', padding: isMobile ? '88px 12px 60px' : '100px 24px 80px', maxWidth: '1080px', width: '100%', margin: '0 auto', overflowX: 'hidden' }}>
 
       {/* HERO */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr auto', alignItems:'end', paddingBottom:'56px', borderBottom:'1px solid rgba(201,164,74,0.1)', marginBottom:'72px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: '12px', alignItems: 'end', paddingBottom: '24px', borderBottom: '1px solid rgba(201,164,74,0.1)', marginBottom: sectionGap }}>
         <div>
           <span style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize:'11px', letterSpacing:'5px', color:'#C9A44A', display:'block', marginBottom:'14px' }}>Gentleman Létal Club</span>
-          <div style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize:'clamp(52px,7vw,80px)', letterSpacing:'4px', color:'#F0EDE8', lineHeight:.95 }}>
+          <div style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize: heroTitleSize, letterSpacing: isMobile ? '2px' : '4px', color:'#F0EDE8', lineHeight:.95 }}>
             {mois[now.getMonth()].toUpperCase()} <span style={{color:'#C9A44A'}}>{now.getFullYear()}</span>
           </div>
           <span style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize:'12px', letterSpacing:'4px', color:'#555', display:'block', marginTop:'14px' }}>{config.tagline}</span>
@@ -104,18 +313,18 @@ export default function Step5Dashboard({ clientData }) {
       </div>
 
       {/* COUNTDOWN */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'1px', background:'rgba(201,164,74,0.08)', border:'1px solid rgba(201,164,74,0.1)', marginBottom:'72px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: '1px', background: 'rgba(201,164,74,0.08)', border: '1px solid rgba(201,164,74,0.1)', marginBottom: sectionGap }}>
         {[['d','Jours'],['h','Heures'],['m','Minutes'],['s','Secondes']].map(([k,l]) => (
-          <div key={k} style={{ background:'#0D0D0D', padding:'32px 20px', textAlign:'center' }}>
-            <span style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize:'52px', letterSpacing:'2px', color:'#F0EDE8', display:'block', lineHeight:1 }}>{countdown[k]}</span>
+          <div key={k} style={{ background:'#0D0D0D', padding: isMobile ? '20px 10px' : '32px 20px', textAlign:'center' }}>
+            <span style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize: countNumberSize, letterSpacing:'2px', color:'#F0EDE8', display:'block', lineHeight:1 }}>{countdown[k]}</span>
             <span style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize:'9px', letterSpacing:'4px', color:'#555', marginTop:'6px', display:'block' }}>{l}</span>
           </div>
         ))}
       </div>
 
       {/* STATS */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'12px', marginBottom:'72px' }}>
-        {[['🔥','0','Streak actuel'],['✓',String(doneDays.size),'Jours complétés'],['◎',String(Math.max(0,daysInMonth-now.getDate())),'Jours restants'],['△','#9','Rang GLC']].map(([icon,val,lbl]) => (
+      <div style={{ display:'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap:'10px', marginBottom: sectionGap }}>
+        {[['🔥','0','Streak actuel'],['✓',String(doneRoutinesCount),'Habitudes validées'],['◎',String(Math.max(0,daysInMonth-validatedDaysCount)),'Jours restants'],['△','#9','Rang GLC']].map(([icon,val,lbl]) => (
           <div key={lbl} style={{ padding:'28px 22px', background:'#161616', border:'1px solid rgba(255,255,255,0.06)', borderRadius:'12px' }}>
             <span style={{ fontSize:'18px', marginBottom:'12px', display:'block', opacity:.8 }}>{icon}</span>
             <span style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize:'40px', letterSpacing:'2px', color:'#F0EDE8', display:'block', marginBottom:'5px' }}>{val}</span>
@@ -125,18 +334,18 @@ export default function Step5Dashboard({ clientData }) {
       </div>
 
       {/* CITATION */}
-      <div style={{ textAlign:'center', padding:'64px 0', borderTop:'1px solid rgba(255,255,255,0.04)', borderBottom:'1px solid rgba(255,255,255,0.04)', marginBottom:'72px' }}>
+      <div style={{ textAlign:'center', padding: isMobile ? '34px 8px' : '64px 0', borderTop:'1px solid rgba(255,255,255,0.04)', borderBottom:'1px solid rgba(255,255,255,0.04)', marginBottom: sectionGap }}>
         <div style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize:'clamp(22px,3.5vw,36px)', letterSpacing:'3px', color:'#C9A44A', lineHeight:1.3, maxWidth:'680px', margin:'0 auto 14px' }}>"{config.citation}"</div>
         <div style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize:'10px', letterSpacing:'4px', color:'#444' }}>— {config.citation_auteur}</div>
       </div>
 
       {/* CALENDRIER */}
-      <div style={{ marginBottom:'64px' }}>
+      <div style={{ marginBottom: sectionGap }}>
         <div style={s.sHead}>
           <span style={{ fontSize:'16px' }}>📅</span>
           <span style={s.sTitle}>Calendrier</span>
           <div style={s.sLine}></div>
-          <button style={s.sBtnG}>+ Événement</button>
+          <button style={s.sBtnG} onClick={openAddEventModal}>+ Evenement</button>
         </div>
         <div style={s.card}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'20px 28px', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
@@ -144,35 +353,48 @@ export default function Step5Dashboard({ clientData }) {
             <div style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize:'18px', letterSpacing:'4px', color:'#F0EDE8' }}>{mois[calMonth].toUpperCase()} {calYear}</div>
             <button onClick={() => { if(calMonth===11){setCalMonth(0);setCalYear(y=>y+1)}else setCalMonth(m=>m+1) }} style={{ width:'30px', height:'30px', background:'#1A1A1A', border:'1px solid rgba(255,255,255,0.06)', borderRadius:'6px', color:'#555', cursor:'pointer', fontSize:'13px' }}>›</button>
           </div>
-          <div style={{ padding:'12px 16px 20px' }}>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'6px', marginBottom:'6px' }}>
+          <div style={{ padding: isMobile ? '10px' : '12px 16px 20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: isMobile ? '4px' : '6px', marginBottom: '6px' }}>
               {DN.map(d => <div key={d} style={{ textAlign:'center', fontFamily:"'Bebas Neue', sans-serif", fontSize:'9px', letterSpacing:'3px', color:'#444', padding:'6px 0' }}>{d}</div>)}
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'6px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: isMobile ? '4px' : '6px' }}>
               {Array(offset).fill(null).map((_,i) => <div key={`e${i}`} />)}
               {Array(daysInMonth).fill(null).map((_,i) => {
                 const d = i+1
                 const isToday = isCurMonth && d === now.getDate()
-                const isDone = doneDays.has(`${calYear}-${calMonth}-${d}`)
+                const isValidated = validatedDays.has(getDateKey(d))
+                const events = getEventsForDay(d)
                 return (
-                  <div key={d} onClick={() => {
-                    if (isToday) return
-                    const key = `${calYear}-${calMonth}-${d}`
-                    setDoneDays(prev => { const n = new Set(prev); isDone ? n.delete(key) : n.add(key); return n })
-                  }} style={{
-                    aspectRatio:'1', borderRadius:'10px',
-                    border: isToday ? '1px solid rgba(201,164,74,0.5)' : isDone ? '1px solid rgba(45,106,53,0.4)' : '1px solid rgba(255,255,255,0.04)',
-                    background: isToday ? 'rgba(201,164,74,0.07)' : isDone ? 'rgba(45,106,53,0.18)' : 'rgba(255,255,255,0.01)',
-                    display:'flex', flexDirection:'column', alignItems:'flex-start', justifyContent:'space-between',
-                    padding:'8px 10px', cursor: isToday ? 'default' : 'pointer', position:'relative', transition:'all .2s'
-                  }}>
+                  <div key={d} style={{
+                    minHeight: isMobile ? '48px' : '64px', borderRadius: '10px',
+                    border: isValidated
+                      ? '1px solid rgba(201,164,74,0.75)'
+                      : isToday ? '1px solid rgba(201,164,74,0.5)' : '1px solid rgba(255,255,255,0.04)',
+                    background: isValidated
+                      ? 'rgba(201,164,74,0.18)'
+                      : isToday ? 'rgba(201,164,74,0.07)' : 'rgba(255,255,255,0.01)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'space-between',
+                    padding: isMobile ? '5px' : '8px 10px', position: 'relative', transition: 'all .2s',
+                    cursor: 'pointer',
+                    userSelect: 'none'
+                  }}
+                    onClick={() => toggleValidatedDay(d)}
+                  >
                     <div style={{ display:'flex', justifyContent:'space-between', width:'100%' }}>
-                      <span style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize:'13px', color: isToday ? '#C9A44A' : isDone ? '#4ade80' : '#888' }}>{d}</span>
-                      {isDone && <div style={{ width:'14px', height:'14px', borderRadius:'50%', background:'#2d6a35', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                        <svg width="7" height="7" viewBox="0 0 10 10"><polyline points="1,5 4,8 9,2" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round"/></svg>
-                      </div>}
+                      <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: isMobile ? '11px' : '13px', color: isValidated ? '#0D0D0D' : isToday ? '#C9A44A' : '#888' }}>{d}</span>
+                      {isValidated && (
+                        <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#C9A44A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <svg width="7" height="7" viewBox="0 0 10 10">
+                            <polyline points="1,5 4,8 9,2" fill="none" stroke="#0D0D0D" strokeWidth="2" strokeLinecap="round" />
+                          </svg>
+                        </div>
+                      )}
                     </div>
-                    {config.evenements[d] && <div style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize:'7px', letterSpacing:'1px', color: isToday ? 'rgba(201,164,74,0.7)' : '#444', lineHeight:1.2 }}>{config.evenements[d]}</div>}
+                    {events.length > 0 && (
+                      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: isMobile ? '6px' : '7px', letterSpacing: '1px', color: isToday ? 'rgba(201,164,74,0.7)' : '#444', lineHeight: 1.2 }}>
+                        {events[0]}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -182,20 +404,23 @@ export default function Step5Dashboard({ clientData }) {
       </div>
 
       {/* OBJECTIFS */}
-      <div style={{ marginBottom:'64px' }}>
+      <div style={{ marginBottom: sectionGap }}>
         <div style={s.sHead}>
           <span style={{ fontSize:'16px' }}>🎯</span>
           <span style={s.sTitle}>Objectifs</span>
           <div style={s.sLine}></div>
-          <button style={s.sBtn}>Modifier</button>
+          <button
+            style={s.sBtn}
+            onClick={() => {
+              setObjectifsDraft(objectifs)
+              openModal('objectifs_edit')
+            }}
+          >
+            Modifier
+          </button>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' }}>
-          {[
-            ['État des lieux', clientData?.questionnaire?.[0]?.text || 'Complète le questionnaire pour voir tes réponses ici.'],
-            ['Ce que tu veux vraiment', clientData?.questionnaire?.[4]?.text || 'Complète le questionnaire pour voir tes réponses ici.'],
-            ['Mes blocages', clientData?.questionnaire?.[6]?.text || 'Complète le questionnaire pour voir tes réponses ici.'],
-            ['Mes ressources', clientData?.questionnaire?.[9]?.text || 'Complète le questionnaire pour voir tes réponses ici.'],
-          ].map(([lbl, txt]) => (
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+          {Object.entries(objectifs).map(([lbl, txt]) => (
             <div key={lbl} style={{ ...s.card, padding:'28px' }}>
               <div style={{ ...s.label }}>{lbl}<div style={{ flex:1, height:'1px', background:'rgba(201,164,74,0.15)' }}></div></div>
               <div style={{ fontSize:'13px', fontWeight:300, color:'#F0EDE8', lineHeight:1.8 }}>{txt}</div>
@@ -205,7 +430,7 @@ export default function Step5Dashboard({ clientData }) {
       </div>
 
       {/* ENGAGEMENTS */}
-      <div style={{ marginBottom:'64px' }}>
+      <div style={{ marginBottom: sectionGap }}>
         <div style={s.sHead}>
           <span style={{ fontSize:'16px' }}>⚔️</span>
           <span style={s.sTitle}>Engagements</span>
@@ -222,12 +447,20 @@ export default function Step5Dashboard({ clientData }) {
       </div>
 
       {/* TODO */}
-      <div style={{ marginBottom:'64px' }}>
+      <div style={{ marginBottom: sectionGap }}>
         <div style={s.sHead}>
           <span style={{ fontSize:'16px' }}>📋</span>
           <span style={s.sTitle}>To-Do</span>
           <div style={s.sLine}></div>
-          <button style={s.sBtnG}>+ Ajouter</button>
+          <button
+            style={s.sBtnG}
+            onClick={() => {
+              setTodoDraftTitle('')
+              openModal('todo_add', { tab: todoTab })
+            }}
+          >
+            + Ajouter
+          </button>
         </div>
         <div style={s.card}>
           <div style={{ display:'flex', borderBottom:'1px solid rgba(255,255,255,0.04)', padding:'4px 12px 0' }}>
@@ -252,15 +485,49 @@ export default function Step5Dashboard({ clientData }) {
       </div>
 
       {/* HABITUDES */}
-      <div style={{ marginBottom:'64px' }}>
+      <div style={{ marginBottom: sectionGap }}>
         <div style={s.sHead}>
           <span style={{ fontSize:'16px' }}>💪</span>
           <span style={s.sTitle}>Habitudes</span>
           <div style={s.sLine}></div>
-          <button style={s.sBtn}>Modifier</button>
-          <button style={s.sBtnG}>+ Ajouter</button>
+          <button
+            style={s.sBtn}
+            onClick={() => {
+              const targetPeriod = routines?.matin?.length ? 'matin' : 'soir'
+              openModal('habit_edit', { period: targetPeriod })
+              const first = routines[targetPeriod]?.[0]
+              if (first) {
+                setHabitDraft({
+                  mode: 'edit',
+                  period: targetPeriod,
+                  index: 0,
+                  name: first.n,
+                  streak: String(first.streak ?? ''),
+                  done: !!first.done,
+                })
+              }
+            }}
+          >
+            Modifier
+          </button>
+          <button
+            style={s.sBtnG}
+            onClick={() => {
+              setHabitDraft({
+                mode: 'add',
+                period: 'matin',
+                index: 0,
+                name: '',
+                streak: '',
+                done: false,
+              })
+              openModal('habit_add')
+            }}
+          >
+            + Ajouter
+          </button>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' }}>
+        <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap:'12px' }}>
           {['matin','soir'].map(period => (
             <div key={period} style={s.card}>
               <div style={{ padding:'16px 24px', fontFamily:"'Bebas Neue', sans-serif", fontSize:'10px', letterSpacing:'4px', color:'#555', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>{period.toUpperCase()}</div>
@@ -281,20 +548,20 @@ export default function Step5Dashboard({ clientData }) {
       </div>
 
       {/* POMODORO */}
-      <div style={{ marginBottom:'64px' }}>
+      <div style={{ marginBottom: sectionGap }}>
         <div style={s.sHead}>
           <span style={{ fontSize:'16px' }}>⏱</span>
           <span style={s.sTitle}>Pomodoro</span>
           <div style={s.sLine}></div>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 240px', gap:'12px' }}>
-          <div style={{ ...s.card, padding:'40px 32px', textAlign:'center' }}>
+        <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 240px', gap:'12px' }}>
+          <div style={{ ...s.card, padding:isMobile ? '20px 12px' : '40px 32px', textAlign:'center' }}>
             <div style={{ display:'flex', border:'1px solid rgba(255,255,255,0.06)', borderRadius:'8px', overflow:'hidden', marginBottom:'32px' }}>
               {[['focus','Focus'],['short','Pause courte'],['long','Pause longue']].map(([k,l]) => (
                 <button key={k} onClick={() => { setPomoPhase(k); setPomoRunning(false); setPomoSec((k==='focus'?pomoVals.f:k==='short'?pomoVals.s:pomoVals.l)*60) }} style={{ flex:1, fontFamily:"'Bebas Neue', sans-serif", fontSize:'9px', letterSpacing:'2px', color: pomoPhase===k ? '#C9A44A' : '#555', background: pomoPhase===k ? 'rgba(201,164,74,0.1)' : 'transparent', border:'none', padding:'10px 4px', cursor:'pointer' }}>{l}</button>
               ))}
             </div>
-            <div style={{ position:'relative', width:'170px', height:'170px', margin:'0 auto 20px' }}>
+            <div style={{ position:'relative', width:'170px', height:'170px', margin:'0 auto 16px' }}>
               <svg width="170" height="170" viewBox="0 0 170 170" style={{ position:'absolute', inset:0, transform:'rotate(-90deg)' }}>
                 <circle cx="85" cy="85" r="74" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="3"/>
                 <circle cx="85" cy="85" r="74" fill="none" stroke="#C9A44A" strokeWidth="3" strokeLinecap="round" strokeDasharray="465" strokeDashoffset={pomoProg}/>
@@ -314,7 +581,7 @@ export default function Step5Dashboard({ clientData }) {
               {Array(4).fill(null).map((_,i) => <div key={i} style={{ width:'6px', height:'6px', borderRadius:'50%', background: i < pomoSess ? '#C9A44A' : '#1A1A1A', border:'1px solid rgba(255,255,255,0.06)' }} />)}
             </div>
           </div>
-          <div style={{ ...s.card, padding:'28px', display:'flex', flexDirection:'column', gap:'24px' }}>
+          <div style={{ ...s.card, padding:'20px', display:'flex', flexDirection:'column', gap:'20px' }}>
             {[['f','Focus (min)'],['s','Pause courte'],['l','Pause longue']].map(([k,l]) => (
               <div key={k}>
                 <div style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize:'9px', letterSpacing:'3px', color:'#555', marginBottom:'8px' }}>{l}</div>
@@ -330,26 +597,43 @@ export default function Step5Dashboard({ clientData }) {
       </div>
 
       {/* NOTES */}
-      <div style={{ marginBottom:'64px' }}>
+      <div style={{ marginBottom: sectionGap }}>
         <div style={s.sHead}>
           <span style={{ fontSize:'16px' }}>✏️</span>
           <span style={s.sTitle}>Notes personnelles</span>
           <div style={s.sLine}></div>
         </div>
         <div style={s.card}>
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Tes réflexions, insights, ce qui émerge pendant le programme..." style={{ width:'100%', background:'transparent', border:'none', color:'#F0EDE8', fontFamily:"'Inter', sans-serif", fontSize:'14px', fontWeight:300, padding:'28px', resize:'none', outline:'none', lineHeight:1.9, minHeight:'180px' }} />
+          <div style={{ padding: '18px' }}>
+            <textarea
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              placeholder="Tes reflexions, insights, ce qui emerge pendant le programme..."
+              style={{ width: '100%', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: '#F0EDE8', fontFamily: "'Inter', sans-serif", fontSize: '14px', fontWeight: 300, padding: '14px', resize: 'vertical', outline: 'none', lineHeight: 1.7, minHeight: '120px', borderRadius: '8px' }}
+            />
+            <button onClick={saveNote} style={{ marginTop: '10px', ...s.sBtnG }}>Sauvegarder note</button>
+          </div>
+          <div style={{ maxHeight: '240px', overflowY: 'auto', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+            {notesHistory.length === 0 && <div style={{ color: '#555', padding: '14px 18px' }}>Aucune note enregistree.</div>}
+            {notesHistory.map((item) => (
+              <div key={item.id} style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                <div style={{ color: '#C9A44A', fontSize: '11px', marginBottom: '6px' }}>{new Date(item.createdAt).toLocaleString('fr-FR')}</div>
+                <div style={{ color: '#F0EDE8', fontSize: '13px', lineHeight: 1.6 }}>{item.text}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* RESSOURCES */}
-      <div style={{ marginBottom:'64px' }}>
+      <div style={{ marginBottom:'28px' }}>
         <div style={s.sHead}>
           <span style={{ fontSize:'16px' }}>🔗</span>
           <span style={s.sTitle}>Ressources & documents</span>
           <div style={s.sLine}></div>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'12px' }}>
-          <div style={s.card}>
+        <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap:'14px' }}>
+          <div style={{ ...s.card, minHeight: '280px' }}>
             <div style={{ padding:'16px 22px', fontFamily:"'Bebas Neue', sans-serif", fontSize:'10px', letterSpacing:'4px', color:'#555', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>Communauté</div>
             {config.ressources.communaute.map(r => (
               <a key={r.label} href={r.url} target="_blank" rel="noreferrer" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'15px 22px', borderBottom:'1px solid rgba(255,255,255,0.03)', textDecoration:'none' }}>
@@ -358,16 +642,29 @@ export default function Step5Dashboard({ clientData }) {
               </a>
             ))}
           </div>
-          <div style={s.card}>
+          <div style={{ ...s.card, minHeight: '280px' }}>
             <div style={{ padding:'16px 22px', fontFamily:"'Bebas Neue', sans-serif", fontSize:'10px', letterSpacing:'4px', color:'#555', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>Mon contrat</div>
             <div style={{ padding:'22px' }}>
               <div style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize:'9px', letterSpacing:'3px', color:'#C9A44A', opacity:.7, marginBottom:'6px' }}>Signé le {clientData?.signatureDate || '—'}</div>
               <div style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize:'18px', letterSpacing:'3px', color:'#F0EDE8', marginBottom:'3px' }}>{clientData?.infos?.prenom || ''} {clientData?.infos?.nom || ''}</div>
               <div style={{ fontFamily:"'Bebas Neue', sans-serif", fontSize:'9px', letterSpacing:'2px', color:'#555', marginBottom:'18px' }}>Gentleman Létal Club — {config.programme}</div>
-              <button style={{ width:'100%', padding:'11px', background:'transparent', border:'1px solid rgba(201,164,74,0.3)', borderRadius:'8px', color:'#C9A44A', fontFamily:"'Bebas Neue', sans-serif", fontSize:'10px', letterSpacing:'3px', cursor:'pointer' }}>Télécharger</button>
+              <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap:'10px' }}>
+                <button
+                  onClick={openContractModal}
+                  style={{ width:'100%', padding:'11px', background:'transparent', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'8px', color:'#F0EDE8', fontFamily:"'Bebas Neue', sans-serif", fontSize:'10px', letterSpacing:'3px', cursor:'pointer' }}
+                >
+                  Voir le contrat
+                </button>
+                <button
+                  onClick={downloadContract}
+                  style={{ width:'100%', padding:'11px', background:'transparent', border:'1px solid rgba(201,164,74,0.3)', borderRadius:'8px', color:'#C9A44A', fontFamily:"'Bebas Neue', sans-serif", fontSize:'10px', letterSpacing:'3px', cursor:'pointer' }}
+                >
+                  Télécharger le contrat
+                </button>
+              </div>
             </div>
           </div>
-          <div style={s.card}>
+          <div style={{ ...s.card, minHeight: '280px' }}>
             <div style={{ padding:'16px 22px', fontFamily:"'Bebas Neue', sans-serif", fontSize:'10px', letterSpacing:'4px', color:'#555', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>Ressources</div>
             {config.ressources.programme.map(r => (
               <a key={r.label} href={r.url} target="_blank" rel="noreferrer" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'15px 22px', borderBottom:'1px solid rgba(255,255,255,0.03)', textDecoration:'none' }}>
@@ -378,6 +675,472 @@ export default function Step5Dashboard({ clientData }) {
           </div>
         </div>
       </div>
+
+        {/* MODALES (pas de prompt/alert natifs) */}
+        <UiModal
+          open={modal.type === 'event_add'}
+          title="Ajouter un événement"
+          onClose={() => {
+            closeModal()
+          }}
+          footer={[
+            <button
+              key="cancel_event"
+              onClick={() => closeModal()}
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: '10px',
+                letterSpacing: '2px',
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: '#F0EDE8',
+                padding: '11px 18px',
+                borderRadius: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              Annuler
+            </button>,
+            <button
+              key="save_event"
+              onClick={saveEventFromModal}
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: '10px',
+                letterSpacing: '2px',
+                background: '#C9A44A',
+                border: '1px solid #C9A44A',
+                color: '#0D0D0D',
+                padding: '11px 18px',
+                borderRadius: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              Ajouter
+            </button>,
+          ]}
+        >
+          <div style={{ display: 'grid', gap: '12px' }}>
+            <div>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '3px', color: '#C9A44A', marginBottom: '8px' }}>
+                Date
+              </div>
+              <input
+                type="date"
+                value={eventDraft.date}
+                onChange={(e) => setEventDraft((d) => ({ ...d, date: e.target.value }))}
+                style={{
+                  width: '100%',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.10)',
+                  borderRadius: '10px',
+                  padding: '12px',
+                  color: '#F0EDE8',
+                  outline: 'none',
+                  fontFamily: "'Inter', sans-serif",
+                }}
+              />
+            </div>
+            <div>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '3px', color: '#C9A44A', marginBottom: '8px' }}>
+                Nom de l événement
+              </div>
+              <input
+                type="text"
+                value={eventDraft.title}
+                onChange={(e) => setEventDraft((d) => ({ ...d, title: e.target.value }))}
+                placeholder="Ex: Call spécial"
+                style={{
+                  width: '100%',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.10)',
+                  borderRadius: '10px',
+                  padding: '12px',
+                  color: '#F0EDE8',
+                  outline: 'none',
+                  fontFamily: "'Inter', sans-serif",
+                }}
+              />
+            </div>
+          </div>
+        </UiModal>
+
+        <UiModal
+          open={modal.type === 'objectifs_edit'}
+          title="Modifier les objectifs"
+          onClose={() => closeModal()}
+          footer={[
+            <button
+              key="cancel_obj"
+              onClick={() => closeModal()}
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: '10px',
+                letterSpacing: '2px',
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: '#F0EDE8',
+                padding: '11px 18px',
+                borderRadius: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              Annuler
+            </button>,
+            <button
+              key="save_obj"
+              onClick={saveObjectifsFromModal}
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: '10px',
+                letterSpacing: '2px',
+                background: '#C9A44A',
+                border: '1px solid #C9A44A',
+                color: '#0D0D0D',
+                padding: '11px 18px',
+                borderRadius: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              Enregistrer
+            </button>,
+          ]}
+        >
+          <div style={{ display: 'grid', gap: '14px' }}>
+            {Object.keys(objectifs).map((key) => (
+              <div key={key}>
+                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '3px', color: '#C9A44A', marginBottom: '8px' }}>
+                  {key}
+                </div>
+                <textarea
+                  value={objectifsDraft?.[key] ?? ''}
+                  onChange={(e) => setObjectifsDraft((d) => ({ ...d, [key]: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    minHeight: '110px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.10)',
+                    borderRadius: '10px',
+                    padding: '12px',
+                    color: '#F0EDE8',
+                    outline: 'none',
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: '14px',
+                    resize: 'vertical',
+                    lineHeight: 1.7,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </UiModal>
+
+        <UiModal
+          open={modal.type === 'habit_edit' || modal.type === 'habit_add'}
+          title={habitDraft.mode === 'add' ? 'Ajouter une habitude' : 'Modifier une habitude'}
+          onClose={() => closeModal()}
+          footer={[
+            <button
+              key="cancel_hab"
+              onClick={() => closeModal()}
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: '10px',
+                letterSpacing: '2px',
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: '#F0EDE8',
+                padding: '11px 18px',
+                borderRadius: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              Annuler
+            </button>,
+            <button
+              key="save_hab"
+              onClick={saveHabitFromModal}
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: '10px',
+                letterSpacing: '2px',
+                background: '#C9A44A',
+                border: '1px solid #C9A44A',
+                color: '#0D0D0D',
+                padding: '11px 18px',
+                borderRadius: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              Enregistrer
+            </button>,
+          ]}
+        >
+          <div style={{ display: 'grid', gap: '14px' }}>
+            <div>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '3px', color: '#C9A44A', marginBottom: '8px' }}>
+                Période
+              </div>
+              <select
+                value={habitDraft.period}
+                onChange={(e) => {
+                  const nextPeriod = e.target.value
+                  const first = routines?.[nextPeriod]?.[0]
+                  setHabitDraft((d) => ({
+                    ...d,
+                    period: nextPeriod,
+                    index: 0,
+                    name: first?.n ?? '',
+                    streak: String(first?.streak ?? ''),
+                    done: !!first?.done,
+                  }))
+                }}
+                style={{
+                  width: '100%',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.10)',
+                  borderRadius: '10px',
+                  padding: '12px',
+                  color: '#F0EDE8',
+                  outline: 'none',
+                  fontFamily: "'Inter', sans-serif",
+                }}
+              >
+                <option value="matin">Matin</option>
+                <option value="soir">Soir</option>
+              </select>
+            </div>
+
+            {habitDraft.mode === 'edit' && (
+              <div>
+                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '3px', color: '#C9A44A', marginBottom: '8px' }}>
+                  Habitude à modifier
+                </div>
+                <select
+                  value={habitDraft.index}
+                  onChange={(e) => {
+                    const nextIndex = Number(e.target.value)
+                    const r = routines?.[habitDraft.period]?.[nextIndex]
+                    setHabitDraft((d) => ({
+                      ...d,
+                      index: nextIndex,
+                      name: r?.n ?? '',
+                      streak: String(r?.streak ?? ''),
+                      done: !!r?.done,
+                    }))
+                  }}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.10)',
+                    borderRadius: '10px',
+                    padding: '12px',
+                    color: '#F0EDE8',
+                    outline: 'none',
+                    fontFamily: "'Inter', sans-serif",
+                  }}
+                >
+                  {(routines?.[habitDraft.period] || []).map((r, i) => (
+                    <option key={`${habitDraft.period}-${i}`} value={i}>
+                      {r.n}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '3px', color: '#C9A44A', marginBottom: '8px' }}>
+                Nom
+              </div>
+              <input
+                type="text"
+                value={habitDraft.name}
+                onChange={(e) => setHabitDraft((d) => ({ ...d, name: e.target.value }))}
+                placeholder="Ex: Lecture 20 min"
+                style={{
+                  width: '100%',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.10)',
+                  borderRadius: '10px',
+                  padding: '12px',
+                  color: '#F0EDE8',
+                  outline: 'none',
+                  fontFamily: "'Inter', sans-serif",
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+              <div>
+                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '3px', color: '#C9A44A', marginBottom: '8px' }}>
+                  Streak
+                </div>
+                <input
+                  type="number"
+                  value={habitDraft.streak}
+                  onChange={(e) => setHabitDraft((d) => ({ ...d, streak: e.target.value }))}
+                  placeholder="Ex: 5"
+                  style={{
+                    width: '100%',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.10)',
+                    borderRadius: '10px',
+                    padding: '12px',
+                    color: '#F0EDE8',
+                    outline: 'none',
+                    fontFamily: "'Inter', sans-serif",
+                  }}
+                />
+              </div>
+
+              {habitDraft.mode === 'edit' && (
+                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
+                    <input
+                      type="checkbox"
+                      checked={!!habitDraft.done}
+                      onChange={(e) => setHabitDraft((d) => ({ ...d, done: e.target.checked }))}
+                      style={{ width: '18px', height: '18px' }}
+                    />
+                    <span style={{ fontFamily: "'Inter', sans-serif", color: '#F0EDE8', fontSize: '13px' }}>
+                      Déjà validée
+                    </span>
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+        </UiModal>
+
+        <UiModal
+          open={modal.type === 'todo_add'}
+          title="Ajouter une tâche"
+          onClose={() => closeModal()}
+          footer={[
+            <button
+              key="cancel_todo"
+              onClick={() => closeModal()}
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: '10px',
+                letterSpacing: '2px',
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: '#F0EDE8',
+                padding: '11px 18px',
+                borderRadius: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              Annuler
+            </button>,
+            <button
+              key="save_todo"
+              onClick={saveTodoFromModal}
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: '10px',
+                letterSpacing: '2px',
+                background: '#C9A44A',
+                border: '1px solid #C9A44A',
+                color: '#0D0D0D',
+                padding: '11px 18px',
+                borderRadius: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              Ajouter
+            </button>,
+          ]}
+        >
+          <div style={{ display: 'grid', gap: '12px' }}>
+            <div>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '3px', color: '#C9A44A', marginBottom: '8px' }}>
+                Titre
+              </div>
+              <input
+                type="text"
+                value={todoDraftTitle}
+                onChange={(e) => setTodoDraftTitle(e.target.value)}
+                placeholder="Ex: Relire les notes du call"
+                style={{
+                  width: '100%',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.10)',
+                  borderRadius: '10px',
+                  padding: '12px',
+                  color: '#F0EDE8',
+                  outline: 'none',
+                  fontFamily: "'Inter', sans-serif",
+                }}
+              />
+            </div>
+            <div style={{ fontFamily: "'Inter', sans-serif", color: '#888', fontSize: '13px' }}>
+              Catégorie: {modal?.tab === 'mois' ? 'Mois' : modal?.tab === 'semaine' ? 'Semaine' : "Aujourd'hui"}
+            </div>
+          </div>
+        </UiModal>
+
+        <UiModal
+          open={modal.type === 'contract_view'}
+          title="Voir le contrat"
+          onClose={() => closeModal()}
+          footer={[
+            <button
+              key="download_contract"
+              onClick={() => {
+                downloadContract()
+                closeModal()
+              }}
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: '10px',
+                letterSpacing: '2px',
+                background: '#C9A44A',
+                border: '1px solid #C9A44A',
+                color: '#0D0D0D',
+                padding: '11px 18px',
+                borderRadius: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              Télécharger
+            </button>,
+            <button
+              key="close_contract"
+              onClick={() => closeModal()}
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: '10px',
+                letterSpacing: '2px',
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: '#F0EDE8',
+                padding: '11px 18px',
+                borderRadius: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              Fermer
+            </button>,
+          ]}
+        >
+          <div
+            style={{
+              maxHeight: isMobile ? '55vh' : '68vh',
+              overflowY: 'auto',
+              background: 'rgba(255,255,255,0.02)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '12px',
+              padding: '14px 14px',
+            }}
+          >
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: "'Inter', sans-serif", fontSize: '13px', lineHeight: 1.8, color: '#F0EDE8' }}>
+              {config.contrat}
+            </pre>
+          </div>
+        </UiModal>
 
     </div>
   )
