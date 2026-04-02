@@ -42,7 +42,7 @@ export default function Step1Welcome({ onNext }) {
     <div style={{
       minHeight: '100vh', display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      padding: '40px clamp(16px, 4vw, 48px)', textAlign: 'center', paddingTop: '80px'
+      padding: '32px clamp(12px, 3vw, 36px)', textAlign: 'center', paddingTop: '72px'
     }}>
       <div style={{
         fontFamily: "'Bebas Neue', sans-serif",
@@ -73,8 +73,8 @@ export default function Step1Welcome({ onNext }) {
 
       <div style={{
         background: '#111', border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: '16px', padding: 'clamp(16px, 2.5vw, 28px)',
-        maxWidth: 'min(1000px, 100%)',
+        borderRadius: '16px', padding: 'clamp(12px, 2vw, 22px)',
+        maxWidth: 'min(1240px, 100%)',
         width: '100%', marginBottom: '32px'
       }}>
         <div style={{
@@ -88,13 +88,13 @@ export default function Step1Welcome({ onNext }) {
             style={{
               position: 'relative',
               width: '100%',
-              aspectRatio: '16 / 9',
               margin: '0 auto',
               borderRadius: '6px',
               overflow: 'hidden',
               border: '1px solid rgba(255,255,255,0.1)',
               background: '#000',
               boxShadow: '0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)',
+              aspectRatio: '16 / 9',
             }}
           >
             {useMp4 ? (
