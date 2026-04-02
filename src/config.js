@@ -6,9 +6,9 @@ const config = {
     citation: "Le confort est l'ennemi du progrès",
     citation_auteur: "Gentleman Létal, Mars 2026",
 
-    // VIDEO D'ACCUEIL (Step 1) — URL absolue pour chargement partout (local + prod)
+    // VIDEO D'ACCUEIL — URL embed YouTube ou fichier .mp4 dans public/
     welcome_video: {
-      src: "https://glc-onboarding.vercel.app/videos/welcome.mp4",
+      src: "https://www.youtube.com/embed/9ZsVtkEmjGg",
       poster: "",
     },
   

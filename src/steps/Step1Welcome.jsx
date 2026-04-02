@@ -1,8 +1,32 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import config from '../config'
 
-/** Même fichier que sur Vercel — fallback si config absente (évite écran vide après merge) */
-const DEFAULT_WELCOME_MP4 = 'https://glc-onboarding.vercel.app/videos/welcome.mp4'
+/** Fallback si config absente — YouTube embed ou chemin .mp4 */
+const DEFAULT_WELCOME_MEDIA = 'https://www.youtube.com/embed/9ZsVtkEmjGg'
+
+function isYoutubeUrl(url) {
+  return /youtube\.com|youtu\.be/i.test(url || '')
+}
+
+/** Normalise watch / youtu.be vers une URL embed */
+function toYoutubeEmbedUrl(url) {
+  if (!url) return ''
+  try {
+    const u = new URL(url.includes('://') ? url : `https://${url}`)
+    if (u.hostname === 'youtu.be') {
+      const id = u.pathname.replace(/^\//, '').split('/')[0]
+      return `https://www.youtube.com/embed/${id}`
+    }
+    if (u.hostname.includes('youtube.com')) {
+      if (u.pathname.startsWith('/embed/')) return url.split('&')[0]
+      const v = u.searchParams.get('v')
+      if (v) return `https://www.youtube.com/embed/${v}`
+    }
+  } catch {
+    /* ignore */
+  }
+  return url
+}
 
 /** Largeur utile sous la carte (carte élargie − padding latéral) */
 const CARD_INNER_MAX_W = 940
@@ -24,7 +48,9 @@ function fitBoxToVideo(video) {
 }
 
 export default function Step1Welcome({ onNext }) {
-  const videoSrc = config.welcome_video?.src?.trim() || DEFAULT_WELCOME_MP4
+  const mediaSrc = config.welcome_video?.src?.trim() || DEFAULT_WELCOME_MEDIA
+  const isYoutube = isYoutubeUrl(mediaSrc)
+  const embedUrl = isYoutube ? toYoutubeEmbedUrl(mediaSrc) : ''
   const videoRef = useRef(null)
   const [box, setBox] = useState(null)
 
@@ -88,40 +114,71 @@ export default function Step1Welcome({ onNext }) {
         }}>Message du mentor</div>
 
         <div style={{ marginBottom: '8px' }}>
-          <div style={{
-            position: 'relative',
-            width: box ? `${box.width}px` : '100%',
-            height: box ? `${box.height}px` : 'min(42vh, 400px)',
-            maxWidth: '100%',
-            margin: '0 auto',
-            borderRadius: '6px',
-            overflow: 'hidden',
-            border: '1px solid rgba(255,255,255,0.1)',
-            background: '#000',
-            boxShadow: '0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)',
-          }}>
-            <video
-              ref={videoRef}
-              poster={config.welcome_video?.poster || undefined}
-              controls
-              playsInline
-              muted
-              autoPlay
-              loop
-              preload="metadata"
-              onLoadedMetadata={(e) => fitVideoBox(e.target)}
-              style={{
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                objectPosition: 'center center',
-              }}
-            >
-              <source src={videoSrc} type="video/mp4" />
-              <source src="/videos/welcome.mp4" type="video/mp4" />
-            </video>
+          <div
+            style={
+              isYoutube
+                ? {
+                    position: 'relative',
+                    width: '100%',
+                    paddingTop: '56.25%',
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    background: '#000',
+                    boxShadow: '0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)',
+                  }
+                : {
+                    position: 'relative',
+                    width: box ? `${box.width}px` : '100%',
+                    height: box ? `${box.height}px` : 'min(42vh, 400px)',
+                    maxWidth: '100%',
+                    margin: '0 auto',
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    background: '#000',
+                    boxShadow: '0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)',
+                  }
+            }
+          >
+            {isYoutube ? (
+              <iframe
+                title="Message du mentor"
+                src={`${embedUrl}${embedUrl.includes('?') ? '&' : '?'}rel=0&modestbranding=1`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                }}
+              />
+            ) : (
+              <video
+                ref={videoRef}
+                poster={config.welcome_video?.poster || undefined}
+                controls
+                playsInline
+                muted
+                autoPlay
+                loop
+                preload="metadata"
+                onLoadedMetadata={(e) => fitVideoBox(e.target)}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  objectPosition: 'center center',
+                }}
+              >
+                <source src={mediaSrc} type="video/mp4" />
+                <source src="/videos/welcome.mp4" type="video/mp4" />
+              </video>
+            )}
           </div>
         </div>
 
