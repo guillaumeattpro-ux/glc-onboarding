@@ -413,14 +413,14 @@ export default function CoachView() {
         const o = JSON.parse(raw)
         return {
           coachPassword: o.coachPassword ?? config.coach_password,
-          prochainCall: o.prochainCall ?? config.prochain_call?.date?.split('T')[0] ?? '2026-03-20',
+          prochainCall: o.prochainCall ?? config.prochain_call?.date?.split('T')[0] ?? '2026-04-09',
           citation: o.citation ?? config.citation,
         }
       }
     } catch {}
     return {
       coachPassword: config.coach_password,
-      prochainCall: config.prochain_call?.date?.split('T')[0] ?? '2026-03-20',
+      prochainCall: config.prochain_call?.date?.split('T')[0] ?? '2026-04-09',
       citation: config.citation,
     }
   })
@@ -948,7 +948,7 @@ export default function CoachView() {
 
             {/* Calendrier */}
             <div style={{ ...cardStyle(), padding: 18 }}>
-              <SectionHeader title="Calendrier — Mars 2026" />
+              <SectionHeader title="Calendrier — Avril 2026" />
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 8 }}>
                 {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, wi) => (
                   <div key={`wd-${wi}`} style={{ ...bebas(9), color: '#555', textAlign: 'center' }}>

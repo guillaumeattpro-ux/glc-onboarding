@@ -1,14 +1,14 @@
 const config = {
     // IDENTITÉ
     nom: "Gentleman Létal Club",
-    programme: "Mars 2026",
+    programme: "Avril 2026",
     tagline: "Le mois le moins confortable de ta vie · Be The Guy",
     citation: "Le confort est l'ennemi du progrès",
-    citation_auteur: "Gentleman Létal, Mars 2026",
+    citation_auteur: "Gentleman Létal, Avril 2026",
   
     // PROCHAIN CALL
     prochain_call: {
-      date: "2026-03-20T20:00:00",
+      date: "2026-04-09T20:00:00",
       label: "Call de groupe — Jeudi 20h"
     },
   
@@ -18,7 +18,7 @@ const config = {
     // CONTRAT
     contrat: `CONTRAT D'ENGAGEMENT — GENTLEMAN LÉTAL CLUB
   
-  En rejoignant le programme Mars 2026, je m'engage à :
+  En rejoignant le programme Avril 2026, je m'engage à :
   
   1. Être présent à chaque call de groupe sans exception
   2. Compléter mes routines quotidiennes 6 jours sur 7

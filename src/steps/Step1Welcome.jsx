@@ -1,40 +1,65 @@
 import config from '../config'
 
-/** ID ou URL embed — modifie ici si tu changes de vidéo */
-const DEFAULT_YOUTUBE_ID = '9ZsVtkEmjGg'
+/** ID de secours si welcome_video.src est vide */
+const DEFAULT_YOUTUBE_ID = 'RmdVKLmw2Xc'
+
+const EMBED_PARAMS = 'rel=0&modestbranding=1&playsinline=1'
+
+/** Extrait l’ID vidéo (watch, embed, youtu.be, shorts, ou ID seul sur 11 car.) */
+function extractYoutubeVideoId(raw) {
+  if (!raw || typeof raw !== 'string') return null
+  const s = raw.trim()
+  if (/\.mp4(\?|$)/i.test(s)) return null
+  if (!/^https?:\/\//i.test(s)) {
+    return /^[a-zA-Z0-9_-]{11}$/.test(s) ? s : null
+  }
+  try {
+    const u = new URL(s)
+    if (u.hostname === 'youtu.be') {
+      return u.pathname.replace(/^\//, '').split('/')[0] || null
+    }
+    if (u.hostname.includes('youtube.com')) {
+      if (u.pathname.startsWith('/embed/')) {
+        return u.pathname.replace(/^\/embed\//, '').split('/')[0] || null
+      }
+      if (u.pathname.startsWith('/shorts/')) {
+        return u.pathname.replace(/^\/shorts\//, '').split('/')[0] || null
+      }
+      const v = u.searchParams.get('v')
+      if (v) return v
+    }
+  } catch {
+    return null
+  }
+  return null
+}
 
 function buildYoutubeEmbedSrc() {
   const raw = config.welcome_video?.src?.trim()
   if (!raw) {
-    return `https://www.youtube.com/embed/${DEFAULT_YOUTUBE_ID}?rel=0&modestbranding=1&playsinline=1`
-  }
-  if (/^https?:\/\//i.test(raw)) {
-    try {
-      const u = new URL(raw)
-      if (u.hostname.includes('youtube.com') && u.pathname.startsWith('/embed/')) {
-        return `${raw.split('&')[0]}?rel=0&modestbranding=1&playsinline=1`
-      }
-      if (u.hostname === 'youtu.be') {
-        const id = u.pathname.replace(/^\//, '').split('/')[0]
-        return `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1`
-      }
-      const v = u.searchParams.get('v')
-      if (v) {
-        return `https://www.youtube.com/embed/${v}?rel=0&modestbranding=1&playsinline=1`
-      }
-    } catch {
-      /* ignore */
-    }
-    return raw.includes('?') ? `${raw}&rel=0&modestbranding=1` : `${raw}?rel=0&modestbranding=1`
+    return `https://www.youtube.com/embed/${DEFAULT_YOUTUBE_ID}?${EMBED_PARAMS}`
   }
   if (/\.mp4(\?|$)/i.test(raw)) {
     return null
   }
-  return `https://www.youtube.com/embed/${raw}?rel=0&modestbranding=1&playsinline=1`
+  const id = extractYoutubeVideoId(raw)
+  if (id) {
+    return `https://www.youtube.com/embed/${id}?${EMBED_PARAMS}`
+  }
+  return `https://www.youtube.com/embed/${DEFAULT_YOUTUBE_ID}?${EMBED_PARAMS}`
+}
+
+/** Lien « ouvrir sur YouTube » (même source que l’embed) */
+function buildYoutubeWatchUrl() {
+  const raw = config.welcome_video?.src?.trim()
+  const id = raw && !/\.mp4(\?|$)/i.test(raw) ? extractYoutubeVideoId(raw) : null
+  const vid = id || DEFAULT_YOUTUBE_ID
+  return `https://www.youtube.com/watch?v=${vid}`
 }
 
 export default function Step1Welcome({ onNext }) {
   const embedSrc = buildYoutubeEmbedSrc()
+  const youtubeWatchUrl = buildYoutubeWatchUrl()
   const mp4Src = config.welcome_video?.src?.trim()
   const useMp4 = mp4Src && /\.mp4(\?|$)/i.test(mp4Src)
 
@@ -116,10 +141,10 @@ export default function Step1Welcome({ onNext }) {
             ) : (
               <iframe
                 title="Message du mentor"
-                src={embedSrc || `https://www.youtube.com/embed/${DEFAULT_YOUTUBE_ID}?rel=0&modestbranding=1&playsinline=1`}
+                src={embedSrc || `https://www.youtube.com/embed/${DEFAULT_YOUTUBE_ID}?${EMBED_PARAMS}`}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
-                referrerPolicy="strict-origin-when-cross-origin"
+                loading="eager"
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -132,6 +157,25 @@ export default function Step1Welcome({ onNext }) {
             )}
           </div>
         </div>
+
+        {!useMp4 && (
+          <p style={{
+            marginTop: '12px',
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: '11px',
+            letterSpacing: '2px',
+            color: '#666',
+          }}>
+            <a
+              href={youtubeWatchUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#C9A44A', textDecoration: 'underline' }}
+            >
+              Ouvrir la vidéo sur YouTube
+            </a>
+          </p>
+        )}
 
         <div style={{
           borderTop: '1px solid rgba(201,164,74,0.15)',
