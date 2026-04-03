@@ -1,7 +1,7 @@
 import config from '../config'
 
 /** ID de secours si welcome_video.src est vide */
-const DEFAULT_YOUTUBE_ID = 'RmdVKLmw2Xc'
+const DEFAULT_YOUTUBE_ID = 'FIgVTGF2bMs'
 
 const EMBED_PARAMS = 'rel=0&modestbranding=1&playsinline=1'
 

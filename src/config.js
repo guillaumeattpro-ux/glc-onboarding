@@ -8,7 +8,7 @@ const config = {
 
     // VIDEO D'ACCUEIL — URL embed YouTube ou fichier .mp4 dans public/
     welcome_video: {
-      src: "https://www.youtube.com/watch?v=RmdVKLmw2Xc",
+      src: "https://www.youtube.com/watch?v=FIgVTGF2bMs",
       poster: "",
     },
   
