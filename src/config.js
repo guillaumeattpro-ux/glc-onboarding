@@ -6,36 +6,30 @@ const config = {
     citation: "Le confort est l'ennemi du progrès",
     citation_auteur: "Gentleman Létal, Avril 2026",
 
-    // VIDEO D'ACCUEIL — URL embed YouTube ou fichier .mp4 dans public/
-    welcome_video: {
-      src: "https://www.youtube.com/watch?v=FIgVTGF2bMs",
-      poster: "",
-    },
-  
     // PROCHAIN CALL
     prochain_call: {
       date: "2026-04-09T20:00:00",
       label: "Call de groupe — Jeudi 20h"
     },
-  
+
     // COACH
     coach_password: "glc2026",
-  
+
     // CONTRAT
     contrat: `CONTRAT D'ENGAGEMENT — GENTLEMAN LÉTAL CLUB
-  
+
   En rejoignant le programme Avril 2026, je m'engage à :
-  
+
   1. Être présent à chaque call de groupe sans exception
   2. Compléter mes routines quotidiennes 6 jours sur 7
   3. Être honnête sur mes blocages et demander de l'aide
   4. Livrer mes objectifs hebdomadaires chaque dimanche soir
   5. Donner le meilleur de moi-même pendant toute la durée du programme
-  
+
   Je comprends que ce programme est conçu pour me pousser hors de ma zone de confort. J'accepte l'inconfort comme outil de croissance.
-  
+
   Fait à _____________________, le _____________________`,
-  
+
     // QUESTIONNAIRE — 15 questions, 5 blocs
     questionnaire: [
       // BLOC 1
@@ -59,7 +53,7 @@ const config = {
       { bloc: "L'engagement", question: "Qu'est-ce que ça changerait pour toi — et pour les gens autour de toi — si tu atteignais ce que tu veux ?" },
       { bloc: "L'engagement", question: "Par quoi tu veux commencer ?" },
     ],
-  
+
     // RESSOURCES DASHBOARD
     ressources: {
       communaute: [
@@ -73,7 +67,7 @@ const config = {
         { label: "Notion du programme", url: "#" },
       ]
     },
-  
+
     // ÉVÉNEMENTS CALENDRIER
     evenements: {
       1: "Lancement",
@@ -86,5 +80,5 @@ const config = {
       31: "Victoire"
     }
   }
-  
+
   export default config

@@ -22,6 +22,33 @@ export default function Step2Contract({ onNext, updateData, clientData }) {
     }
   }, [clientData])
 
+  // Setup canvas with correct DPR to avoid blurry strokes on retina/mobile
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const dpr = window.devicePixelRatio || 1
+    const w = canvas.offsetWidth
+    const h = canvas.offsetHeight
+    canvas.width = w * dpr
+    canvas.height = h * dpr
+    const ctx = canvas.getContext('2d')
+    ctx.scale(dpr, dpr)
+    drawBaseline(ctx, w, h)
+  }, [])
+
+  function drawBaseline(ctx, w, h) {
+    ctx.save()
+    ctx.strokeStyle = 'rgba(201,164,74,0.2)'
+    ctx.lineWidth = 1
+    ctx.setLineDash([5, 7])
+    ctx.beginPath()
+    ctx.moveTo(20, h * 0.68)
+    ctx.lineTo(w - 20, h * 0.68)
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.restore()
+  }
+
   useEffect(() => {
     if (!signatureDate) return
     const parsedDate = new Date(signatureDate)
@@ -58,9 +85,7 @@ export default function Step2Contract({ onNext, updateData, clientData }) {
     const ctx = canvas.getContext('2d')
     const point = getPoint(e)
 
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current)
-    }
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
     rafRef.current = requestAnimationFrame(() => {
       const from = lastPointRef.current || point
       const midX = (from.x + point.x) / 2
@@ -83,8 +108,10 @@ export default function Step2Contract({ onNext, updateData, clientData }) {
 
   const clearCanvas = () => {
     const canvas = canvasRef.current
+    const dpr = window.devicePixelRatio || 1
     const ctx = canvas.getContext('2d')
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr)
+    drawBaseline(ctx, canvas.offsetWidth, canvas.offsetHeight)
     setSigned(false)
   }
 
@@ -124,7 +151,6 @@ export default function Step2Contract({ onNext, updateData, clientData }) {
           Ton engagement
         </h2>
 
-        {/* CONTRAT */}
         <div style={{
           background: '#111', border: '1px solid rgba(255,255,255,0.06)',
           borderRadius: '14px', padding: '22px', marginBottom: '24px'
@@ -139,7 +165,6 @@ export default function Step2Contract({ onNext, updateData, clientData }) {
           </pre>
         </div>
 
-        {/* CHECKBOX */}
         <div
           onClick={() => setAgreed(!agreed)}
           style={{
@@ -166,11 +191,8 @@ export default function Step2Contract({ onNext, updateData, clientData }) {
             htmlFor="signature-date"
             style={{
               fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: '10px',
-              letterSpacing: '3px',
-              color: '#C9A44A',
-              display: 'block',
-              marginBottom: '8px',
+              fontSize: '10px', letterSpacing: '3px',
+              color: '#C9A44A', display: 'block', marginBottom: '8px',
             }}
           >
             Date de signature
@@ -181,17 +203,13 @@ export default function Step2Contract({ onNext, updateData, clientData }) {
             value={signatureDate}
             onChange={(e) => setSignatureDate(e.target.value)}
             style={{
-              width: '100%',
-              background: 'rgba(255,255,255,0.03)',
+              width: '100%', background: 'rgba(255,255,255,0.03)',
               border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '8px',
-              padding: '12px',
-              color: '#F0EDE8',
+              borderRadius: '8px', padding: '12px', color: '#F0EDE8',
             }}
           />
         </div>
 
-        {/* SIGNATURE */}
         <div style={{
           background: '#111', border: '1px solid rgba(255,255,255,0.06)',
           borderRadius: '14px', padding: '18px', marginBottom: '24px'
@@ -205,7 +223,6 @@ export default function Step2Contract({ onNext, updateData, clientData }) {
           </div>
           <canvas
             ref={canvasRef}
-            width={580} height={150}
             onPointerDown={startDraw}
             onPointerMove={doDraw}
             onPointerUp={stopDraw}
@@ -222,7 +239,7 @@ export default function Step2Contract({ onNext, updateData, clientData }) {
             display: 'flex', justifyContent: 'space-between',
             alignItems: 'center', marginTop: '12px'
           }}>
-            <span style={{ fontSize: '12px', color: '#444' }}>
+            <span style={{ fontSize: '12px', color: signed ? '#C9A44A' : '#444' }}>
               {signed ? '✓ Signature enregistrée' : 'Signe dans le cadre ci-dessus'}
             </span>
             <button

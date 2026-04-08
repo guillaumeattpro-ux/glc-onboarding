@@ -8,17 +8,32 @@ import Step5Dashboard from './steps/Step5Dashboard'
 import CoachView from './coach/CoachView'
 
 const STEPS = ['Bienvenue', 'Contrat', 'Infos', 'Questionnaire', 'Dashboard']
+const STORAGE_KEY = 'glc_onboarding_client_data_v1'
+
+function deriveStep(data) {
+  if (!data || typeof data !== 'object') return 0
+  if (data.questionnaire && Object.keys(data.questionnaire).length >= 15) return 4
+  if (data.infos?.prenom) return 3
+  if (data.contratSigne) return 2
+  return 0
+}
 
 export default function App() {
-  const storageKey = 'glc_onboarding_client_data_v1'
-  const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false
-  const [step, setStep] = useState(0)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   const [clientData, setClientData] = useState(() => {
     try {
-      const raw = localStorage.getItem(storageKey)
+      const raw = localStorage.getItem(STORAGE_KEY)
       return raw ? JSON.parse(raw) : {}
     } catch {
       return {}
+    }
+  })
+  const [step, setStep] = useState(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      return raw ? deriveStep(JSON.parse(raw)) : 0
+    } catch {
+      return 0
     }
   })
   const [isCoach, setIsCoach] = useState(false)
@@ -26,17 +41,24 @@ export default function App() {
   const updateData = useCallback((newData) => {
     setClientData(prev => ({ ...prev, ...newData }))
   }, [])
+
   const next = () => setStep(s => Math.min(s + 1, 4))
 
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(clientData))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(clientData))
   }, [clientData])
 
-  // Accès coach via URL ?coach=true
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   const isCoachUrl = useMemo(() => {
     const urlParams = new URLSearchParams(window.location.search)
     return urlParams.get('coach') === 'true'
   }, [])
+
   useEffect(() => {
     if (isCoachUrl) setIsCoach(true)
   }, [isCoachUrl])
@@ -47,7 +69,6 @@ export default function App() {
     <div style={{ minHeight: '100vh', position: 'relative' }}>
       <Background />
 
-      {/* BARRE DE PROGRESSION */}
       {step < 4 && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
@@ -89,7 +110,6 @@ export default function App() {
         </div>
       )}
 
-      {/* ÉTAPES */}
       <div style={{ position: 'relative', zIndex: 2 }}>
         {step === 0 && <Step1Welcome onNext={next} />}
         {step === 1 && <Step2Contract onNext={next} updateData={updateData} clientData={clientData} />}

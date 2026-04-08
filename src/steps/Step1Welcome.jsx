@@ -70,9 +70,9 @@ export default function Step1Welcome({ onNext }) {
       padding: '32px clamp(12px, 3vw, 36px)', textAlign: 'center', paddingTop: '72px'
     }}>
       <div style={{
-        fontFamily: "'Bebas Neue', sans-serif",
-        fontSize: '11px', letterSpacing: '5px', color: '#C9A44A',
-        marginBottom: '20px'
+        fontFamily: "'Inter', sans-serif", fontWeight: 500,
+        fontSize: '11px', letterSpacing: '3px', color: '#C9A44A',
+        marginBottom: '24px', textTransform: 'uppercase'
       }}>
         {config.nom}
       </div>
@@ -81,17 +81,17 @@ export default function Step1Welcome({ onNext }) {
         fontFamily: "'Bebas Neue', sans-serif",
         fontSize: 'clamp(52px, 8vw, 96px)',
         letterSpacing: '4px', color: '#F0EDE8',
-        lineHeight: '.95', marginBottom: '20px'
+        lineHeight: '.92', marginBottom: '20px'
       }}>
         {config.programme.split(' ')[0]}{' '}
         <span style={{ color: '#C9A44A' }}>{config.programme.split(' ')[1]}</span>
       </h1>
 
       <p style={{
-        fontFamily: "'Bebas Neue', sans-serif",
-        fontSize: '13px', letterSpacing: '4px',
-        color: '#555', marginBottom: '28px',
-        maxWidth: '500px'
+        fontFamily: "'Inter', sans-serif", fontWeight: 300,
+        fontSize: '13px', letterSpacing: '2px',
+        color: '#404040', marginBottom: '32px',
+        maxWidth: '480px'
       }}>
         {config.tagline}
       </p>
@@ -103,9 +103,9 @@ export default function Step1Welcome({ onNext }) {
         width: '100%', marginBottom: '32px'
       }}>
         <div style={{
-          fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: '10px', letterSpacing: '4px', color: '#C9A44A',
-          marginBottom: '16px'
+          fontFamily: "'Inter', sans-serif", fontWeight: 600,
+          fontSize: '10px', letterSpacing: '2px', color: '#C9A44A',
+          marginBottom: '16px', textTransform: 'uppercase'
         }}>Message du mentor</div>
 
         <div style={{ marginBottom: '8px' }}>
@@ -178,10 +178,11 @@ export default function Step1Welcome({ onNext }) {
         )}
 
         <div style={{
-          borderTop: '1px solid rgba(201,164,74,0.15)',
+          borderTop: '1px solid rgba(201,164,74,0.1)',
           paddingTop: '18px',
           fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: '13px', letterSpacing: '3px', color: '#C9A44A'
+          fontSize: '14px', letterSpacing: '3px', color: '#C9A44A',
+          lineHeight: 1.4
         }}>
           "{config.citation}"
         </div>
@@ -191,15 +192,16 @@ export default function Step1Welcome({ onNext }) {
         type="button"
         onClick={onNext}
         style={{
-          fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: '14px', letterSpacing: '3px',
-          padding: '18px 48px',
+          fontFamily: "'Inter', sans-serif", fontWeight: 600,
+          fontSize: '13px', letterSpacing: '1.5px',
+          padding: '17px 52px',
           background: '#C9A44A', border: 'none',
           color: '#0D0D0D', cursor: 'pointer',
-          borderRadius: '8px', transition: 'all .2s'
+          borderRadius: '10px', textTransform: 'uppercase',
+          boxShadow: '0 4px 20px rgba(201,164,74,0.25)',
         }}
-        onMouseEnter={e => { e.target.style.background = '#E8C06A' }}
-        onMouseLeave={e => { e.target.style.background = '#C9A44A' }}
+        onMouseEnter={e => { e.currentTarget.style.background = '#E8C06A'; e.currentTarget.style.boxShadow = '0 6px 28px rgba(201,164,74,0.38)' }}
+        onMouseLeave={e => { e.currentTarget.style.background = '#C9A44A'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(201,164,74,0.25)' }}
       >
         Entrer dans l'arène →
       </button>
